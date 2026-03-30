@@ -1,0 +1,142 @@
+### AI Dashboard Builder API 测试
+### 使用 REST Client 插件 (VS Code)
+### 或 httpie: pip install httpie
+
+@baseUrl = http://localhost:3001/api
+@contentType = application/json
+
+### 1. 健康检查
+GET {{baseUrl}}/health
+
+### 2. 用户注册
+# @name register
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "email": "test@example.com",
+  "password": "password123"
+}
+
+### 3. 用户登录
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "test@example.com",
+  "password": "password123"
+}
+
+### 4. 获取当前用户（需要替换 token）
+# @name getMe
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{login.response.body.data.token}}
+
+### 5. 检查邮箱是否可用
+GET {{baseUrl}}/auth/check-email?email=test2@example.com
+
+### 6. 创建 Workspace
+# @name createWorkspace
+POST {{baseUrl}}/workspaces
+Content-Type: {{contentType}}
+Authorization: Bearer {{login.response.body.data.token}}
+
+{
+  "name": "销售周报",
+  "description": "每周销售数据分析看板",
+  "config": {
+    "charts": [
+      {
+        "id": "chart-1",
+        "type": "line",
+        "title": "销售额趋势",
+        "data": [],
+        "config": {
+          "type": "line",
+          "title": "销售额趋势",
+          "dimensions": ["date"],
+          "metrics": [{"field": "amount", "name": "销售额"}],
+          "timeRange": "7d"
+        },
+        "position": {"x": 0, "y": 0, "w": 6, "h": 4}
+      }
+    ],
+    "layout": [{"i": "chart-1", "x": 0, "y": 0, "w": 6, "h": 4}]
+  },
+  "isDefault": true
+}
+
+### 7. 获取所有 Workspace
+# @name getWorkspaces
+GET {{baseUrl}}/workspaces
+Authorization: Bearer {{login.response.body.data.token}}
+
+### 8. 获取单个 Workspace（需要替换 id）
+GET {{baseUrl}}/workspaces/{{createWorkspace.response.body.data.id}}
+Authorization: Bearer {{login.response.body.data.token}}
+
+### 9. 获取默认 Workspace
+GET {{baseUrl}}/workspaces/default
+Authorization: Bearer {{login.response.body.data.token}}
+
+### 10. 更新 Workspace（需要替换 id）
+PUT {{baseUrl}}/workspaces/{{createWorkspace.response.body.data.id}}
+Content-Type: {{contentType}}
+Authorization: Bearer {{login.response.body.data.token}}
+
+{
+  "name": "销售周报（已更新）",
+  "description": "更新后的描述"
+}
+
+### 11. 更新 Workspace 配置（需要替换 id）
+PATCH {{baseUrl}}/workspaces/{{createWorkspace.response.body.data.id}}/config
+Content-Type: {{contentType}}
+Authorization: Bearer {{login.response.body.data.token}}
+
+{
+  "config": {
+    "charts": [
+      {
+        "id": "chart-1",
+        "type": "bar",
+        "title": "各地区销售额对比",
+        "data": [],
+        "config": {
+          "type": "bar",
+          "title": "各地区销售额对比",
+          "dimensions": ["region"],
+          "metrics": [{"field": "amount", "name": "销售额"}],
+          "timeRange": "30d"
+        },
+        "position": {"x": 0, "y": 0, "w": 6, "h": 4}
+      }
+    ],
+    "layout": [{"i": "chart-1", "x": 0, "y": 0, "w": 6, "h": 4}]
+  }
+}
+
+### 12. 设置默认 Workspace（需要替换 id）
+PATCH {{baseUrl}}/workspaces/{{createWorkspace.response.body.data.id}}/default
+Authorization: Bearer {{login.response.body.data.token}}
+
+### 13. 删除 Workspace（需要替换 id）
+DELETE {{baseUrl}}/workspaces/{{createWorkspace.response.body.data.id}}
+Authorization: Bearer {{login.response.body.data.token}}
+
+### 14. 测试错误：未授权
+GET {{baseUrl}}/workspaces
+
+### 15. 测试错误：无效的 Token
+GET {{baseUrl}}/workspaces
+Authorization: Bearer invalid_token_here
+
+### 16. 测试错误：无效的请求数据
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "email": "invalid-email",
+  "password": "123"
+}
