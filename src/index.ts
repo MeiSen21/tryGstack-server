@@ -68,7 +68,7 @@ const gracefulShutdown = async (signal: string) => {
   
   try {
     // 关闭数据库连接
-    const { disconnect } = await import('./config/database');
+    const { disconnect } = await import('./config/database.js');
     await disconnect();
     
     console.log('Graceful shutdown completed');
