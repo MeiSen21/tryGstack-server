@@ -2,9 +2,56 @@ const express = require('express');
 const cors = require('cors');
 const svgCaptcha = require('svg-captcha');
 const { v4: uuidv4 } = require('uuid');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+
+// 简单的内存速率限制器
+const rateLimiter = new Map();
+const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15分钟
+const RATE_LIMIT_MAX = 5; // 最大请求次数
+
+function checkRateLimit(key) {
+  const now = Date.now();
+  const windowStart = now - RATE_LIMIT_WINDOW;
+  
+  // 清理过期的记录
+  for (const [k, v] of rateLimiter.entries()) {
+    if (v.timestamp < windowStart) {
+      rateLimiter.delete(k);
+    }
+  }
+  
+  const record = rateLimiter.get(key);
+  if (!record) {
+    rateLimiter.set(key, { count: 1, timestamp: now });
+    return { allowed: true };
+  }
+  
+  if (record.count >= RATE_LIMIT_MAX) {
+    return { 
+      allowed: false, 
+      retryAfter: Math.ceil((record.timestamp + RATE_LIMIT_WINDOW - now) / 1000)
+    };
+  }
+  
+  record.count++;
+  return { allowed: true };
+}
+
+// JWT 密钥（生产环境应从环境变量读取）
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const JWT_EXPIRES_IN = '24h';
 
 const app = express();
-app.use(cors());
+
+// CORS 配置 - 限制允许的源
+const corsOptions = {
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:5173', 'http://localhost:3000'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // 存储验证码
@@ -53,7 +100,8 @@ apiRouter.get('/auth/captcha', (req, res) => {
     data: {
       captchaId,
       svg,
-      code: text  // 开发模式返回验证码文本方便测试
+      // 只在开发环境返回验证码文本，方便测试
+      ...(process.env.NODE_ENV === 'development' && { code: text })
     }
   });
 });
@@ -76,13 +124,25 @@ apiRouter.get('/auth/captcha/refresh', (req, res) => {
     data: {
       captchaId,
       svg,
-      code: text
+      // 只在开发环境返回验证码文本
+      ...(process.env.NODE_ENV === 'development' && { code: text })
     }
   });
 });
 
 // 注册 - POST /api/auth/register
-apiRouter.post('/auth/register', (req, res) => {
+apiRouter.post('/auth/register', async (req, res) => {
+  // 速率限制检查
+  const clientIp = req.ip || req.connection.remoteAddress;
+  const limitKey = `register:${clientIp}`;
+  const rateLimit = checkRateLimit(limitKey);
+  
+  if (!rateLimit.allowed) {
+    return res.status(429).json({
+      success: false,
+      error: { message: `请求过于频繁，请 ${rateLimit.retryAfter} 秒后重试` }
+    });
+  }
   const { email, password, captchaId, captchaCode } = req.body;
   
   // 验证验证码
@@ -115,14 +175,27 @@ apiRouter.post('/auth/register', (req, res) => {
     createdAt: new Date().toISOString()
   };
   
-  users.set(email, { password, user });
+  // 使用 bcrypt 哈希密码（salt rounds = 10）
+  const hashedPassword = await bcrypt.hash(password, 10);
+  users.set(email, { password: hashedPassword, user });
   captchas.delete(captchaId);
   
   res.json({ success: true, data: { user } });
 });
 
 // 登录 - POST /api/auth/login
-apiRouter.post('/auth/login', (req, res) => {
+apiRouter.post('/auth/login', async (req, res) => {
+  // 速率限制检查
+  const clientIp = req.ip || req.connection.remoteAddress;
+  const limitKey = `login:${clientIp}`;
+  const rateLimit = checkRateLimit(limitKey);
+  
+  if (!rateLimit.allowed) {
+    return res.status(429).json({
+      success: false,
+      error: { message: `请求过于频繁，请 ${rateLimit.retryAfter} 秒后重试` }
+    });
+  }
   const { email, password, captchaId, captchaCode } = req.body;
   
   // 验证验证码
@@ -135,14 +208,28 @@ apiRouter.post('/auth/login', (req, res) => {
   }
   
   const userData = users.get(email);
-  if (!userData || userData.password !== password) {
+  if (!userData) {
     return res.status(400).json({ 
       success: false, 
       error: { message: '邮箱或密码错误' } 
     });
   }
   
-  const token = 'mock-jwt-token-' + uuidv4();
+  // 使用 bcrypt 验证密码
+  const validPassword = await bcrypt.compare(password, userData.password);
+  if (!validPassword) {
+    return res.status(400).json({ 
+      success: false, 
+      error: { message: '邮箱或密码错误' } 
+    });
+  }
+  
+  // 生成真正的 JWT Token
+  const token = jwt.sign(
+    { userId: userData.user.id, email: userData.user.email },
+    JWT_SECRET,
+    { expiresIn: JWT_EXPIRES_IN }
+  );
   captchas.delete(captchaId);
   
   res.json({
@@ -151,6 +238,38 @@ apiRouter.post('/auth/login', (req, res) => {
       user: userData.user,
       token
     }
+  });
+});
+
+// JWT 验证中间件
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+  
+  if (!token) {
+    return res.status(401).json({
+      success: false,
+      error: { message: '未提供认证令牌' }
+    });
+  }
+  
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({
+        success: false,
+        error: { message: '令牌无效或已过期' }
+      });
+    }
+    req.user = user;
+    next();
+  });
+}
+
+// 需要保护的示例路由
+apiRouter.get('/protected/profile', authenticateToken, (req, res) => {
+  res.json({
+    success: true,
+    data: { user: req.user }
   });
 });
 
