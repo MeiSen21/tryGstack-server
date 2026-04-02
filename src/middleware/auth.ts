@@ -1,7 +1,7 @@
 import { Response, NextFunction } from 'express';
-import { AuthRequest } from '../types';
+import { AuthRequest, UserRole } from '../types';
 import { verifyToken } from '../utils/jwt';
-import { UnauthorizedError } from '../utils/errors';
+import { UnauthorizedError, ForbiddenError } from '../utils/errors';
 
 /**
  * JWT 认证中间件
@@ -32,6 +32,7 @@ export const authMiddleware = (
     }
 
     req.userId = decoded.userId;
+    req.userRole = decoded.role;
     next();
   } catch (error) {
     next(error);
@@ -59,11 +60,37 @@ export const optionalAuthMiddleware = (
     
     if (decoded && decoded.userId) {
       req.userId = decoded.userId;
+      req.userRole = decoded.role;
     }
     
     next();
   } catch (error) {
     // 可选认证失败不阻止请求
     next();
+  }
+};
+
+/**
+ * 管理员权限校验中间件
+ * 要求用户必须是 admin 角色
+ */
+export const requireAdmin = (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): void => {
+  try {
+    // 必须先经过 authMiddleware
+    if (!req.userId) {
+      throw new UnauthorizedError('请先登录');
+    }
+
+    if (req.userRole !== 'admin') {
+      throw new ForbiddenError('需要管理员权限');
+    }
+
+    next();
+  } catch (error) {
+    next(error);
   }
 };

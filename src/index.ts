@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import authRoutes from './routes/auth';
 import workspaceRoutes from './routes/workspaces';
+import adminRoutes from './routes/admin';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { corsMiddleware } from './middleware/cors';
 import { testConnection } from './config/database';
@@ -31,6 +32,7 @@ app.get('/health', (req, res) => {
 // API 路由
 app.use('/api/auth', authRoutes);
 app.use('/api/workspaces', workspaceRoutes);
+app.use('/api/admin', adminRoutes);
 
 // 404 处理
 app.use(notFoundHandler);

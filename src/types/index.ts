@@ -5,9 +5,17 @@ export interface User {
   id: string;
   email: string;
   password: string;
+  role: 'admin' | 'user';
+  status: 'active' | 'disabled';
   createdAt: Date;
   updatedAt: Date;
 }
+
+// 用户角色
+export type UserRole = 'admin' | 'user';
+
+// 用户状态
+export type UserStatus = 'active' | 'disabled';
 
 export interface Workspace {
   id: string;
@@ -24,6 +32,7 @@ export interface Workspace {
 
 export interface AuthRequest extends Request {
   userId?: string;
+  userRole?: UserRole;
 }
 
 // ==================== API 响应类型 ====================
@@ -134,8 +143,39 @@ export interface GridLayout {
 
 export interface JwtPayload {
   userId: string;
+  role: UserRole;
   iat?: number;
   exp?: number;
+}
+
+// ==================== 用户管理相关类型 ====================
+
+export interface GetUsersQuery {
+  page?: number;
+  pageSize?: number;
+  username?: string; // 邮箱模糊搜索
+}
+
+export interface UpdateUserInput {
+  email?: string;
+  role?: UserRole;
+  status?: UserStatus;
+}
+
+export interface UserListItem {
+  id: string;
+  email: string;
+  role: UserRole;
+  status: UserStatus;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface PaginatedUsersResponse {
+  total: number;
+  page: number;
+  pageSize: number;
+  list: UserListItem[];
 }
 
 // ==================== 环境变量类型 ====================
