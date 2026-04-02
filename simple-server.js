@@ -11,6 +11,12 @@ app.use(express.json());
 const captchas = new Map();
 const users = new Map();
 
+// 配置常量
+const CONFIG = {
+  MAX_USERS: 1000,        // 最大用户数限制
+  CAPTCHA_EXPIRY: 5 * 60 * 1000,  // 验证码过期时间：5分钟
+};
+
 // 生成验证码
 function generateCaptchaData() {
   const captcha = svgCaptcha.create({
@@ -40,7 +46,7 @@ apiRouter.get('/auth/captcha', (req, res) => {
   captchas.set(captchaId, text.toLowerCase());
   
   // 5分钟后过期
-  setTimeout(() => captchas.delete(captchaId), 5 * 60 * 1000);
+  setTimeout(() => captchas.delete(captchaId), CONFIG.CAPTCHA_EXPIRY);
   
   res.json({
     success: true,
@@ -63,7 +69,7 @@ apiRouter.get('/auth/captcha/refresh', (req, res) => {
   const captchaId = uuidv4();
   captchas.set(captchaId, text.toLowerCase());
   
-  setTimeout(() => captchas.delete(captchaId), 5 * 60 * 1000);
+  setTimeout(() => captchas.delete(captchaId), CONFIG.CAPTCHA_EXPIRY);
   
   res.json({
     success: true,
@@ -92,6 +98,14 @@ apiRouter.post('/auth/register', (req, res) => {
     return res.status(400).json({ 
       success: false, 
       error: { message: '该邮箱已注册' } 
+    });
+  }
+  
+  // 检查用户数限制，防止内存泄漏
+  if (users.size >= CONFIG.MAX_USERS) {
+    return res.status(503).json({
+      success: false,
+      error: { message: '系统用户数量已达上限，请联系管理员' }
     });
   }
   
