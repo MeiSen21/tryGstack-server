@@ -68,6 +68,7 @@ export class AuthService {
         ...userWithoutPassword,
         role: userWithoutPassword.role as 'admin' | 'user',
         status: (userWithoutPassword.status as 'active' | 'disabled') || 'active',
+        permissions: userWithoutPassword.permissions,
       },
       token,
     };
@@ -119,6 +120,7 @@ export class AuthService {
         ...userWithoutPassword,
         role: userWithoutPassword.role as 'admin' | 'user',
         status: (userWithoutPassword.status as 'active' | 'disabled') || 'active',
+        permissions: userWithoutPassword.permissions,
       },
       token,
     };
@@ -143,6 +145,7 @@ export class AuthService {
       ...userWithoutPassword,
       role: userWithoutPassword.role as 'admin' | 'user',
       status: (userWithoutPassword.status as 'active' | 'disabled') || 'active',
+      permissions: userWithoutPassword.permissions,
     };
   }
 

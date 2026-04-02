@@ -9,6 +9,7 @@ export interface User {
   status: 'active' | 'disabled';
   createdAt: Date;
   updatedAt: Date;
+  permissions?: any; // 用户细粒度权限配置
 }
 
 // 用户角色

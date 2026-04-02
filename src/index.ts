@@ -4,6 +4,7 @@ import cors from 'cors';
 import authRoutes from './routes/auth';
 import workspaceRoutes from './routes/workspaces';
 import adminRoutes from './routes/admin';
+import permissionRoutes from './routes/permissions';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { corsMiddleware } from './middleware/cors';
 import { testConnection } from './config/database';
@@ -33,6 +34,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/workspaces', workspaceRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/permissions', permissionRoutes);
 
 // 404 处理
 app.use(notFoundHandler);

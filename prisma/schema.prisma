@@ -7,27 +7,31 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model users {
-  id         String       @id
-  email      String       @unique
-  password   String
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime
-  role       String       @default("user")
-  status     String       @default("active")
-  workspaces workspaces[]
+model User {
+  id          String       @id @default(uuid())
+  email       String       @unique
+  password    String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  role        String       @default("user")
+  status      String       @default("active")
+  permissions Json?        // 用户细粒度权限配置
+  workspaces  Workspace[]
+
+  @@map("users")
 }
 
-model workspaces {
-  id          String   @id
+model Workspace {
+  id          String   @id @default(uuid())
   name        String
   description String?
   config      Json
   isDefault   Boolean  @default(false)
   createdAt   DateTime @default(now())
-  updatedAt   DateTime
+  updatedAt   DateTime @updatedAt
   userId      String
-  users       users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@map("workspaces")
 }
