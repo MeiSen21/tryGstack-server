@@ -18,13 +18,21 @@ export class WorkspaceService {
    * @returns Workspace 列表
    */
   async findAllByUser(userId: string): Promise<Workspace[]> {
-    return prisma.workspace.findMany({
+    // 安全检查：确保 userId 有效
+    if (!userId) {
+      throw new BadRequestError('用户ID不能为空');
+    }
+    
+    const workspaces = await prisma.workspace.findMany({
       where: { userId },
       orderBy: [
         { isDefault: 'desc' },
         { updatedAt: 'desc' },
       ],
     });
+    
+    console.log(`[WorkspaceService] 用户 ${userId} 查询到 ${workspaces.length} 个工作区`);
+    return workspaces;
   }
 
   /**
